@@ -4,9 +4,9 @@ Donate link: https://www.paypal.com/cgi-bin/webscr?cmd=_donations&business=abela
 License: GPLv3
 License URI: http://www.gnu.org/licenses/gpl.html
 Tags: wordpress password policy, password policy, password policy manager, wordpress password, password strength, password, authentication, security, wordpress user password, strong password, strong wordpress password, authentication, password security, password expire, strong wordpress password plugin
-Requires at least: 3.6.0
-Tested up to: 4.2.2
-Stable tag: 0.8
+Requires at least: 4.0
+Tested up to: 4.3
+Stable tag: 0.11
 
 Configure WordPress password policies to ensure all WordPress users use strong passwords and improve the security of your WordPress.
 
@@ -54,12 +54,13 @@ Another way to ensure WordPress security is to have full control of your WordPre
 * Built-in policies do not allow for a password to be the same as WordPress user
 
 = WP Password Policy Manager in Your Language =
-We need help translating the plugin. If you're good at translating, please drop us an email on [plugins@wpwhitesecurity.com](mailto:plugins@wpwhitesecurity.com). WP Password Policy Manager is available in:
+We need help translating the plugin. If you're good at translating, please drop us an email on [wp.kytten@gmail.com](mailto:wp.kytten@gmail.com). WP Password Policy Manager is available in:
 
-Italian thanks to [Marco Borla](https://www.peopleinside.it/)
-Dutch thanks to [Anne Jan Roeleveld](http://www.annejanroeleveld.nl/)
-Polish thanks to [Piotr Matuszewski](http://www.megaweb.pl)
-Serbo-Croatian thanks to Borisa Djuraskovic from [Web Hosting Hub](http://www.webhostinghub.com/)
+Italian thanks to [Marco Borla](https://www.peopleinside.it/), 
+Dutch thanks to [Anne Jan Roeleveld](http://www.annejanroeleveld.nl/), 
+Polish thanks to [Piotr Matuszewski](http://www.megaweb.pl), 
+Serbo-Croatian thanks to Borisa Djuraskovic from [Web Hosting Hub](http://www.webhostinghub.com/), 
+Spanish thanks to [Apasionados](http://apasionados.es/)
 
 = Plugin Newsletter =
 To keep yourself updated with what is new and updated in our WordPress security plugins please subscribe to the [WP White Security Plugins Newsletter](http://eepurl.com/Jn9sP).
@@ -89,15 +90,40 @@ If a WordPress user's password is expired, the user will be notified and asked t
 
 == Changelog ==
 
+= 0.11 (2015-08-17) =
+* **Updates**
+    * Fixes php error generated when adding the wp cron action (ref: https://wordpress.org/support/topic/update-to-010-could-not-be-activated-because-it-triggered-a-fatal-error)
+
+= 0.10 (2015-08-17) =
+* **Updates**
+    * Updated version properly
+
+= 0.9 (2015-08-17) =
+* **New features**
+    * Implemented the MultiSite feature
+    * Updated strings for translation
+    * Added missing text domain to translation functions
+	* Fixes js error when resetting all passwords
+	* Add new option so administrators can use WP Cron to reset passwords if the site has many users
+	* Updated "Requires at least" entry
+	* Updated "Tested up to" entry
+	* Updated .pot file
+	* Added language files for English
+	* Updated javascript files
+
+* **New Translations**
+	* Added Spanish translation
+
+
 = 0.8 (2015-05-23) =
-* ** Updated plugin ownership **
+* **Updated plugin ownership**
 	* Changed ownership of the plugin
 	* Updated "Tested up to" entry
 
 = 0.7 (2015-02-27) =
 * **New Feature**
 	* Added nonces to the plugin form to avoid an issue where an attacker could trick an authenticated / logged in user to reset all passwords or make other changes.
-	
+
 * **New Translations**
 	* The following translatoins have been added; Italian, Dutch, Polish and Serbo-Croatian.
 
@@ -108,13 +134,13 @@ If a WordPress user's password is expired, the user will be notified and asked t
 = 0.5 (2014-12-8) =
 * **New Features**
 	* Administrators can now enforce a user to specify the current password in profile page when changing the password - Administrators are exempt from this requirement so they can easily reset other users' password. Thanks to [Jens Nilson](https://profiles.wordpress.org/jensnilsson) for recommending this feature and for helping in developing it.
-	
+
 * **Improvements**
 	* Removed the need to write to /js/wppmpp.tmp.js and using built-in wp_localize_script. Update by [Jens Nilson](https://profiles.wordpress.org/jensnilsson)
-	
+
 * **Bug Fixes**
 	* Fixed an issue when user was redirected to password reset page when an incorrect user was specified
-	* Fixed 
+	* Fixed
 = 0.4 (2014-12-1) =
 * **Bug Fix**
 	* Fixed an issue where the password was not being reset properly when changed by the admin on a user's profile page

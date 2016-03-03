@@ -4,7 +4,7 @@ Plugin Name: WordPress Password Policy Manager
 Plugin URI: http://www.wpwhitesecurity.com/wordpress-security-plugins/wordpress-password-policy-manager-plugin/
 Description: WordPress Password Policy Manager allows WordPress administrators to configure password policies for WordPress users to use strong passwords.
 Author: wpkytten
-Version: 0.8
+Version: 0.11
 Text Domain: wp-password-policy-manager
 Domain Path: /languages/
 Author URI: http://www.wpwhitesecurity.com/
@@ -53,6 +53,10 @@ class WpPasswordPolicyManager
     const DEF_OPT_SPL = false;
     const OPT_USER_PWDS = 'wppm_lst_pwd';
     const OPT_USER_RST_PWD = 'wppm_rst_pwd';
+    //@since 0.8
+    const OPT_DISABLE_ADMINS = 'wppm_daa';
+    //@since 0.9
+    private static $_instance = null;
 
     // </editor-fold>
 
@@ -61,6 +65,7 @@ class WpPasswordPolicyManager
         // register actions
         foreach(array(
                     array('admin_menu', 0),
+                    array('admin_init', 1),
                     array('network_admin_menu', 0),
                     array('admin_enqueue_scripts', 0),
                     array('admin_footer', 0),
@@ -95,16 +100,17 @@ class WpPasswordPolicyManager
      * Standard singleton pattern.
      * @return \self Returns the current plugin instance.
      */
-    public static function GetInstance()
-    {
-        static $instance = null;
-        if (!$instance) $instance = new self();
-        return $instance;
+    public static function GetInstance(){
+        if(is_null(self::$_instance) || !(self::$_instance instanceof self)){
+            self::$_instance = new self;
+        }
+        return self::$_instance;
     }
-    // </editor-fold>
+// </editor-fold desc=">>> Entry Points">
 
 
-    // <editor-fold desc="WP Internals">
+// <editor-fold desc=">>> WP Internals">
+
 
     /**
      * Load plugin textdomain.
@@ -120,7 +126,8 @@ class WpPasswordPolicyManager
         $_nMaxSamePass = $this->GetMaxSamePass();
         if ($_nMaxSamePass) {
             $rules[] = sprintf(__('not be one of the previous %d used passwords.', 'wp-password-policy-manager'), $_nMaxSamePass);
-        } else {
+        }
+        else {
             $rules[] = __('not be the same as the previous one', 'wp-password-policy-manager');
         }
 
@@ -175,16 +182,6 @@ class WpPasswordPolicyManager
         if(!$this->IsUserPasswordOld($user)){
             return;
         }
-        ?>
-        <p>
-            <label for="user_pass_new"><?php _e('New Password', 'wp-password-policy-manager') ?><br />
-                <input type="password" name="user_pass_new" id="user_pass_new" class="input" value="<?php echo ''; ?>" size="25" /></label>
-        </p>
-        <p>
-            <label for="user_pass_vfy"><?php _e('Verify Password', 'wp-password-policy-manager') ?><br />
-                <input type="password" name="user_pass_vfy" id="user_pass_vfy" class="input" value="<?php echo ''; ?>" size="25" /></label>
-        </p>
-        <?php
 
         wp_enqueue_script('front-js', $this->GetBaseUrl().'js/front.js', array('jquery'), rand(1,1234));
         wp_localize_script('front-js', 'wppm_ModifyForm', array(
@@ -195,10 +192,25 @@ class WpPasswordPolicyManager
             'NewPasswordRules' => $this->GetPasswordRules(),
             'NewPassRulesHead' => __('New password must...', 'wp-password-policy-manager'),
             'NewPassRulesFoot' => __('WordPress Password Policies by', 'wp-password-policy-manager')
-                . '<br/><a href="http://www.wpwhitesecurity.com/wordpress-security-plugins/wp-password-policy-manager/" target="_blank">'
-                    . __('WP Password Policy Manager', 'wp-password-policy-manager')
-                . '</a>'
+                                  . '<br/><a href="http://www.wpwhitesecurity.com/wordpress-security-plugins/wp-password-policy-manager/" target="_blank">'
+                                  . __('WP Password Policy Manager', 'wp-password-policy-manager')
+                                  . '</a>'
         ));
+
+        ?>
+        <p>
+            <label for="user_pass_new"><?php _e('New Password', 'wp-password-policy-manager'); ?><br />
+                <input type="password" name="user_pass_new" id="user_pass_new" class="input"
+                       placeholder="<?php _e('New Password', 'wp-password-policy-manager'); ?>"
+                       value="<?php echo ''; ?>" size="25" /></label>
+        </p>
+        <p>
+            <label for="user_pass_vfy"><?php _e('Verify Password', 'wp-password-policy-manager'); ?><br />
+                <input type="password" name="user_pass_vfy" id="user_pass_vfy" class="input"
+                       placeholder="<?php _e('Verify Password', 'wp-password-policy-manager'); ?>"
+                       value="<?php echo ''; ?>" size="25" /></label>
+        </p>
+        <?php
     }
 
     protected $shouldModify = false;
@@ -265,7 +277,7 @@ class WpPasswordPolicyManager
             }
             else{
                 if($wasReset){
-                    $diff = __('1 minute');
+                    $diff = __('1 minute', 'wp-password-policy-manager');
                 }
                 else { $diff = human_time_diff(strtotime($this->GetPasswordTtl(), $this->GetPasswordLastModTime($user->ID)), current_time('timestamp')); }
                 return new WP_Error('expired_password', sprintf(__('<strong>ERROR</strong>: The password you entered expired %s ago.', 'wp-password-policy-manager'), $diff));
@@ -280,9 +292,11 @@ class WpPasswordPolicyManager
         <table class="form-table">
             <?php if($this->IsPolicyEnabled(self::POLICY_OLDPASSWORD) && !$this->UserCanSkipOldPwdPolicy()) { ?>
             <tr>
-                <th><label for="wppmoldpass"><?php _e('Current Password', 'wp-password-policy-manager') ;?></label></th>
+                <th><label for="wppmoldpass"><?php _e('Current Password', 'wp-password-policy-manager');?></label></th>
                 <td>
-                    <input type="password" name="wppmoldpass" id="wppmoldpass" class="regular-text" size="16" value="" autocomplete="off"><br>
+                    <input type="password" name="wppmoldpass" id="wppmoldpass" class="regular-text" size="16" value=""
+                           placeholder="<?php _e('Current Password', 'wp-password-policy-manager');?>"
+                           autocomplete="off"><br>
                     <span class="description"><?php _e('Type your current password to be able to change your password.', 'wp-password-policy-manager'); ?></span>
                 </td>
             </tr>
@@ -311,7 +325,7 @@ class WpPasswordPolicyManager
         $pass1 = (isset($_REQUEST['pass1']) ? $_REQUEST['pass1'] : '');
         $pass2 = (isset($_REQUEST['pass2']) ? $_REQUEST['pass2'] : '');
         $oldpass = '';
-        if($this->IsPolicyEnabled(self::POLICY_OLDPASSWORD) && !$this->UserCanSkipOldPwdPolicy($user)) {
+        if($this->IsPolicyEnabled(self::POLICY_OLDPASSWORD) && !$this->UserCanSkipOldPwdPolicy()) {
             $oldpass = (isset($_REQUEST['wppmoldpass']) ? $_REQUEST['wppmoldpass'] : '');
         }
         return $this->__validateProfile($errors, $user, $pass1, $pass2, $oldpass);
@@ -346,33 +360,39 @@ class WpPasswordPolicyManager
             if((isset($pass1) && isset($pass2)) && (!empty($pass1) && !empty($pass2)))
             {
                 if(empty($pass1) || empty($pass2)){
-                    $errors->add('expired_password', '<strong>ERROR</strong>: The new password cannot be empty.', 'wp-password-policy-manager');
+                    $errors->add('expired_password',
+                        __('<strong>ERROR</strong>: The new password cannot be empty.','wp-password-policy-manager'));
                     return $errors;
                 }
                 if($pass1 <> $pass2){
-                    $errors->add('expired_password', '<strong>ERROR</strong>: Both new passwords must match.', 'wp-password-policy-manager');
+                    $errors->add('expired_password',
+                        __('<strong>ERROR</strong>: Both new passwords must match.', 'wp-password-policy-manager'));
                     return $errors;
                 }
                 $validateOldPass = ($this->IsPolicyEnabled(self::POLICY_OLDPASSWORD) && !$this->UserCanSkipOldPwdPolicy());
                 if($validateOldPass && empty($oldpass)){
-                    $errors->add('expired_password', '<strong>ERROR</strong>: Please enter the current password in the Current Password field.', 'wp-password-policy-manager');
+                    $errors->add('expired_password',
+                        __('<strong>ERROR</strong>: Please enter the current password in the Current Password field.','wp-password-policy-manager'));
                     return $errors;
                 }
 
                 // get the current pass
                 $crtPwd = $userInfo->user_pass;
                 if(wp_check_password($pass1, $crtPwd, $user->ID)){
-                    $errors->add('expired_password', '<strong>ERROR</strong>: New password cannot be the same as the old one.', 'wp-password-policy-manager');
+                    $errors->add('expired_password',
+                        __('<strong>ERROR</strong>: New password cannot be the same as the old one.','wp-password-policy-manager'));
                     return $errors;
                 }
                 // new password cannot be the same as the username
                 if($pass1 == $userInfo->user_login){
-                    $errors->add('expired_password', '<strong>ERROR</strong>: New password cannot be the same as the username.', 'wp-password-policy-manager');
+                    $errors->add('expired_password',
+                        __('<strong>ERROR</strong>: New password cannot be the same as the username.','wp-password-policy-manager'));
                     return $errors;
                 }
                 // new password cannot be the same as the email
                 if($pass1 == $userInfo->user_email){
-                    $errors->add('expired_password', '<strong>ERROR</strong>: New password cannot be the same as the email.', 'wp-password-policy-manager');
+                    $errors->add('expired_password',
+                        __('<strong>ERROR</strong>: New password cannot be the same as the email.','wp-password-policy-manager'));
                     return $errors;
                 }
                 // Apply password policies
@@ -526,10 +546,10 @@ class WpPasswordPolicyManager
         return $user;
     }
 
-    // </editor-fold>
+// </editor-fold desc=">>> WP Internals">
 
 
-    // <editor-fold desc="Wordpress Extensions">
+// <editor-fold desc="WordPress Extensions">
     /**
      * Get a global (across multiple sites) option.
      * @param string $name Option name.
@@ -556,7 +576,6 @@ class WpPasswordPolicyManager
         $fn = $this->IsMultisite() ? 'delete_site_option' : 'delete_option';
         $fn($name);
     }
-
     /**
      * Get a user-specific option.
      * @param string $name Option name.
@@ -607,10 +626,9 @@ class WpPasswordPolicyManager
     protected function IsManagingAdmin(){
         return current_user_can('manage_options');
     }
-// </editor-fold>
+// </editor-fold desc="WordPress Extensions">
 
-    // <editor-fold desc="Misc Functionality">
-
+// <editor-fold desc="Misc Functionality">
     public function UserCanSkipOldPwdPolicy(){
         $user = wp_get_current_user();
         if($this->IsUserExemptFromPolicies($user)){
@@ -619,7 +637,6 @@ class WpPasswordPolicyManager
         // If this is not his profile & is admin
         return user_can($user->ID, 'manage_options');
     }
-
     /**
      * @return string Password policy time to live as a string.
      */
@@ -711,6 +728,17 @@ class WpPasswordPolicyManager
     public function SetMaxSamePass($value){
         $this->SetGlobalOption(self::OPT_NAME_MSP, $value);
     }
+    //@since 0.8
+    public function DisableAdminsAccess($value){
+        $this->SetGlobalOption(self::OPT_DISABLE_ADMINS, $value);
+    }
+    //@since 0.8
+    public function IsAdminAccessDisabled(){
+        if(is_super_admin()){
+            return false;
+        }
+        return (bool)$this->GetGlobalOption(self::OPT_DISABLE_ADMINS);
+    }
     protected function EchoIdent($name){
         echo self::DEF_PFX . '_' . $name;
     }
@@ -736,41 +764,224 @@ class WpPasswordPolicyManager
             $this->SetPolicyState(self::POLICY_SPECIAL, $this->IsPostIdent('spc'));
             $this->SetPolicyState(self::POLICY_OLDPASSWORD, $this->IsPostIdent('opw'));
             $this->SetExemptTokens(isset($_REQUEST['ExemptTokens']) ? $_REQUEST['ExemptTokens'] : array());
-            if($this->IsPostIdent('msp'))
-                $this->SetMaxSamePass((int)$this->GetPostIdent('msp'));
-        } else {
+            if($this->IsPostIdent('msp')) {
+                $this->SetMaxSamePass( (int)$this->GetPostIdent( 'msp' ) );
+            }
+            if($this->IsMultisite()){
+                if($this->IsPostIdent('daa'))
+                    $this->DisableAdminsAccess((int)$this->GetPostIdent('daa'));
+                else $this->DisableAdminsAccess(0);
+            }
+            // since v0.9
+            // Will reset passwords for users using WP Cron
+            // Useful when there are many users
+            // see: https://wordpress.org/support/topic/timeout-when-resetting-all-passwords
+            // requirement: WP_CRON must be available
+            $bid = null;
+            if(isset($_POST['WPPM_BID'])){
+                $bid = intval($_POST['WPPM_BID']);
+            }
+            if($this->IsPostIdent('wpcron')){
+                //exit('INDENT FOUND');
+                $this->SetGlobalOption(self::CRON_RESET_PWD_OPT_NAME, 1);
+                $this->SetGlobalOption(self::CRON_RESET_PWD_BID_OPT_NAME, $bid);
+            }
+        }
+        else {
             throw new Exception(__('Security check failed', 'wp-password-policy-manager'));
         }
     }
 
-    protected function ResetWpPasswords()
+    protected function ResetWpPasswords($blogId = null)
     {
-        if (!empty($_REQUEST['_wpnonce']) && wp_verify_nonce( $_REQUEST['_wpnonce'], 'nonce_form' )) {
-            $users = new WP_User_Query(array('blog_id' => 0));
-            foreach ($users->get_results() as $user) {
-                $new_password = wp_generate_password();
-                wp_set_password($new_password, $user->ID);
-                // The blogname option is escaped with esc_html on the way into the database in sanitize_option
-                // we want to reverse this for the plain text arena of emails.
-                $blogname = wp_specialchars_decode(get_option('blogname'), ENT_QUOTES);
+        if (!empty($_REQUEST['_wpnonce']) && wp_verify_nonce( $_REQUEST['_wpnonce'], 'nonce_form' ))
+        {
+            //#Implements #4
+            // When the site admin clicks "reset all passwords" all the passwords for that site only should be reset
 
-                $message = '<!DOCTYPE html><html><head><meta charset="UTF-8"/></head><body>';
-                $message .= sprintf(__('<p>Your password for <strong>%s</strong> has been reset.</p>', 'wp-password-policy-manager'), $blogname) . "\r\n\r\n";
-                $message .= sprintf(__('<p>New Password: <strong>%s</strong></p>', 'wp-password-policy-manager'), $new_password) . "\r\n\r\n";
-                $message .= sprintf(__('<p>Please log in and change your password:', 'wp-password-policy-manager')) . "\r\n";
-                $message .= wp_login_url() . "</p>\r\n";
-                $message .= '</body></html>';
-                $result = self::SendNotificationEmail($user->user_email, $message);
-                if ($result) {
-                    // reset & expire
-                    $this->SetGlobalOption(self::OPT_USER_RST_PWD . '_' . $user->ID, true);
-                    update_user_option($user->ID, self::OPT_NAME_UPM, current_time('timestamp'));
+            // Make sure this is a valid request
+            if($this->IsAdminAccessDisabled()){
+                throw new Exception(__('Security check failed', 'wp-password-policy-manager'));
+            }
+
+            // If this is a request coming from the Super Admin
+            $isSuperAdminReq = is_super_admin();
+
+            // All blogs in the network
+            if(empty($blogId)){
+                global $wpdb;
+                $query = "SELECT DISTINCT(blog_id) FROM ".$wpdb->blogs.' WHERE spam = 0 AND deleted = 0';
+                $blogs = $wpdb->get_results($query, ARRAY_A);
+                if(empty($blogs)){
+                    error_log(__FUNCTION__.'() Error: no blogs found.');
+                    return false;
+                }
+                foreach($blogs as $blog){
+                    $this->_resetPasswordsHelper($blog['blog_id'], $isSuperAdminReq);
                 }
             }
-        } else {
+            // Specific site
+            else {
+                $this->_resetPasswordsHelper(get_current_blog_id(), $isSuperAdminReq);
+            }
+        }
+        else {
             throw new Exception(__('Security check failed', 'wp-password-policy-manager'));
         }
     }
+
+    private function _resetPasswordsHelper($blogId = 0, $exceptSuperAdmin = true, $usingCron = false)
+    {
+//        if(defined( 'DOING_CRON' )){
+//            error_log(__METHOD__.'() triggered by wp cron.');
+//        }
+
+        // Select users for the specified blog
+        $queryData = null;
+        if($blogId){
+            $queryData = array('blog_id' => (int)$blogId);
+        }
+        $usersQuery = new WP_User_Query($queryData);
+        if($usersQuery){
+            $users = $usersQuery->get_results();
+        }
+        if(empty($users)){
+            error_log('No users found for blog id: '.$blogId);
+            return;
+        }
+//error_log('Blog ID: '.$blogId);
+//error_log('Users found: '.count($users));
+//error_log(str_repeat('-',80));
+
+
+
+        $letters = range('a','z');
+        $specials = array('~', '!', '@', '#', '$', '%', '^', '&', '*', '-', '+', '=', '.', ',');
+
+        foreach ($users as $user)
+        {
+//error_log('PROCESSING USERS OF BLOG: '.$blogId);
+//error_log(str_repeat('-',80));
+            if(! isset($user->ID)){
+                error_log('USER ID NOT FOUND');
+                continue;
+            }
+            $userInfo = $user->data;
+
+            $also = ($usingCron ? true : $exceptSuperAdmin);
+
+            // Ignore Super Admins
+            if(is_super_admin($user->ID) && $also) {
+//error_log('The user is super admin ('.$user->ID.', '.$userInfo->user_nicename.') Ignoring request for password change.');
+                continue;
+            }
+
+            // @since v0.9
+            // In case wp cron fails to do this in one request and will have to go through
+            // all suers all again, make sure it will only process those that didn't make it
+            // in the first run
+            $updated =  $this->GetGlobalOption(self::OPT_USER_RST_PWD . '_' . $user->ID);
+            if($updated){
+//error_log('USER PASSWORD ALREADY UPDATED FOR THIS USER: ('.$user->ID.', '.$userInfo->user_nicename.'). Skipping.');
+                continue;
+            }
+
+            $new_password = wp_generate_password();
+
+            // Ensure the generated password follows the plugin's policies
+            if($this->IsPolicyEnabled(self::POLICY_MIXCASE)){
+                if(strtolower($new_password) == $new_password){
+                    $new_password .= strtoupper($letters[ array_rand($letters) ]);
+                }
+            }
+            if($this->IsPolicyEnabled(self::POLICY_NUMBERS)){
+                if(!preg_match('/[0-9]/', $new_password)){
+                    $new_password .= rand(0,9);
+                }
+            }
+            if($this->IsPolicyEnabled(self::POLICY_SPECIAL)){
+                if(!preg_match('/[_\W]/', $new_password)){
+                    $new_password .= strtoupper($specials[ array_rand($specials) ]);
+                }
+            }
+
+            $new_password = str_shuffle($new_password);
+            $_nMaxSamePass = $this->GetMaxSamePass();
+            if($_nMaxSamePass){
+                while($this->_pwdHasBeenUsed($user->ID, $new_password)){
+                    $new_password = str_shuffle($new_password);
+                }
+            }
+
+            // The blogname option is escaped with esc_html on the way into the database in sanitize_option
+            // we want to reverse this for the plain text arena of emails.
+            $blogname = wp_specialchars_decode(get_option('blogname'), ENT_QUOTES);
+
+//error_log('Blog ID: '.$blogId.' ('.$blogname.'). Password changed for user: '.$userInfo->user_nicename.'. New password is: ' .$new_password);
+
+            $message = '<!DOCTYPE html><html><head><meta charset="UTF-8"/></head><body>';
+            $message .= sprintf(__('<p>Your password for <strong>%s</strong> has been reset.</p>', 'wp-password-policy-manager'), $blogname) . "\r\n\r\n";
+            $message .= sprintf(__('<p>New Password: <strong>%s</strong></p>', 'wp-password-policy-manager'), $new_password) . "\r\n\r\n";
+            $message .= sprintf(__('<p>Please log in and change your password:', 'wp-password-policy-manager')) . "\r\n";
+            $message .= wp_login_url() . "</p>\r\n";
+            $message .= '</body></html>';
+            $result = self::SendNotificationEmail($user->user_email, $message);
+            if ($result) {
+                // Set the new password
+                wp_set_password($new_password, $user->ID);
+
+                // reset & expire
+                $this->SetGlobalOption(self::OPT_USER_RST_PWD . '_' . $user->ID, true);
+                update_user_option($user->ID, self::OPT_NAME_UPM, current_time('timestamp'));
+
+//error_log('Username: '.$userInfo->user_nicename);
+//error_log('Email: '.$user->user_email);
+//error_log($message);
+//error_log(str_repeat('-',80));
+            }
+        }
+        // Cleanup
+        // @since v0.9
+        $this->DeleteGlobalOption(self::CRON_RESET_PWD_OPT_NAME);
+        $this->DeleteGlobalOption(self::CRON_RESET_PWD_BID_OPT_NAME);
+    }
+
+    /**
+     * Retrieve a blog through an AJAX call
+     *
+     * @since 0.8
+     */
+    public function get_blogs_ajax(){
+        check_ajax_referer( 'nonce_form', 'nonce' );
+
+        if(! isset($_POST) || empty($_POST)){
+            wp_send_json_error(__('Invalid request', 'wp-password-policy-manager'));
+        }
+
+        if(! isset($_POST['q'])){
+            wp_send_json_error(__('Invalid request', 'wp-password-policy-manager'));
+        }
+
+        global $wpdb;
+
+        $q = esc_sql($_POST['q']);
+
+        $query = "SELECT * FROM ".$wpdb->blogs." WHERE domain like '%".$q."%' AND spam = 0 AND deleted = 0 ORDER BY blog_id";
+        $data = $wpdb->get_results($query);
+        if(empty($data)){
+            wp_send_json_success( array() );
+        }
+        $out = array();
+        foreach($data as $entry){
+            $blogDetails = get_blog_details($entry->blog_id, true);
+            array_push($out, array(
+                'id' => $entry->blog_id,
+                'name' => $blogDetails->blogname
+            ));
+        }
+        wp_send_json_success( $out );
+    }
+
     protected function SendNotificationEmail($emailAddress, $message){
         $headers = sprintf('From: %s <%s>', get_bloginfo('name'), get_bloginfo('admin_email'))."\r\n";
         $headers .= sprintf('Reply-to: %s <%s>', get_bloginfo('name'), get_bloginfo('admin_email'))."\r\n";
@@ -786,7 +997,10 @@ class WpPasswordPolicyManager
     final public function _set_html_content_type(){ return 'text/html'; }
     protected function GetTokenType($token){
         $users = array();
-        foreach(get_users('blog_id=0&fields[]=user_login') as $obj)
+
+        $blogId = ($this->IsMultisite() ? 0 : get_current_blog_id());
+
+        foreach(get_users('blog_id='.$blogId.'&fields[]=user_login') as $obj)
             $users[] = $obj->user_login;
         $roles = array_keys(get_editable_roles());
         if(in_array($token, $users))return 'user';
@@ -796,13 +1010,34 @@ class WpPasswordPolicyManager
     /**
      * Renders WordPress settings page.
      */
-    public function ManageWpOptions(){
+    public function ManageWpOptions()
+    {
         // control access to plugin
-        if (!$this->IsManagingAdmin()) {
+        if (!$this->IsManagingAdmin() || $this->IsAdminAccessDisabled()) {
             wp_die(__('You do not have sufficient permissions to access this page.', 'wp-password-policy-manager'));
         }
         // update submitted settings
-        if(isset($_POST) && count($_POST)){
+        if(isset($_POST) && count($_POST))
+        {
+            //since 0.8
+            if($this->IsMultisite() && is_super_admin()){
+                $__blogId = 0;
+                $__allBlogs = false;
+                if(isset($_POST['wppm-reset-sites'])){
+                    if($_POST['wppm-reset-sites'] < 1){
+                        $__allBlogs = true;
+                    }
+                    else {
+                        $__blogId = $_POST['wppm-reset-sites'];
+                    }
+                }
+                $bid = ($__allBlogs ? 0 : $__blogId);
+            }
+            else {
+                $bid = get_current_blog_id();
+            }
+            $_POST['WPPM_BID'] = $bid;
+
             try {
                 switch(true){
                     case isset($_POST[self::DEF_PFX.'_snt']):
@@ -810,22 +1045,41 @@ class WpPasswordPolicyManager
                         ?><div class="updated"><p><strong><?php _e('Settings saved.', 'wp-password-policy-manager'); ?></strong></p></div><?php
                         break;
                     case isset($_POST[self::DEF_PFX.'_rst']):
-                        $this->ResetWpPasswords();
-                        ?><div class="updated"><p><strong><?php _e('All passwords have been reset.', 'wp-password-policy-manager'); ?></strong></p></div><?php
+                        if(! is_null($bid)){
+                            // since v0.9
+                            // Check if cron enabled
+                            if($this->IsPostIdent('wpcron')){
+                                // REGISTER ACTION
+                                $this->SetGlobalOption(self::CRON_RESET_PWD_BID_OPT_NAME, $bid);
+                                $this->SetGlobalOption(self::CRON_RESET_PWD_OPT_NAME, 1);
+                                ?><div class="updated"><p><strong>
+                                        <?php _e('Request registered. Passwords will be reset using WP Cron in 10 minutes.','wp-password-policy-manager');?>
+                                    </strong></p></div>
+                                <?php
+                            }
+                            else {
+                                $this->DeleteGlobalOption(self::CRON_RESET_PWD_OPT_NAME);
+                                $this->DeleteGlobalOption(self::CRON_RESET_PWD_BID_OPT_NAME);
+                                $this->ResetWpPasswords($bid);
+                                ?><div class="updated"><p><strong><?php _e('All passwords have been reset.', 'wp-password-policy-manager'); ?></strong></p></div><?php
+                            }
+                        }
                         break;
                     default:
-                        throw new Exception('Unexpected form submission content.', 'wp-password-policy-manager');
+                        throw new Exception(__('Unexpected form submission content.', 'wp-password-policy-manager'));
                 }
             } catch (Exception $ex) {
-                ?><div class="error"><p><strong><?php _e(__('Error', 'wp-password-policy-manager').': '.$ex->getMessage()); ?></strong></p></div><?php
+                ?><div class="error"><p><strong><?php echo __('Error', 'wp-password-policy-manager').': '.$ex->getMessage(); ?></strong></p></div><?php
             }
         }
         // display settings page
         ?><div class="wrap">
-        <h2><?php echo __('WordPress Password Policy Manager Settings'); ?></h2>
+        <h2><?php _e('WordPress Password Policy Manager Settings', 'wp-password-policy-manager'); ?></h2>
         <form method="post" id="wppm_settings">
             <input type="hidden" name="page" value="<?php echo esc_attr($_REQUEST['page']); ?>" />
             <input type="hidden" id="ajaxurl" value="<?php echo esc_attr(admin_url('admin-ajax.php')); ?>" />
+            <?php wp_nonce_field( 'nonce_form' ); ?>
+
             <div id="wppm-adverts">
                 <a href="http://www.wpwhitesecurity.com/plugins-premium-extensions/email-notifications-wordpress/?utm_source=wppmplugin&utm_medium=settingspage&utm_campaign=notifications" target="_blank">
                     <img src="<?php echo $this->GetBaseUrl();?>/img/notifications_250x150.gif" width="250" height="150" alt="">
@@ -851,7 +1105,7 @@ class WpPasswordPolicyManager
                 <tr valign="top">
                     <th scope="row"><label for="<?php $this->EchoIdent('len'); ?>"><?php _e('Password Length Policy', 'wp-password-policy-manager'); ?></label></th>
                     <td>
-                        <select type="text" id="<?php $this->EchoIdent('len'); ?>" name="<?php $this->EchoIdent('len'); ?>"><?php
+                        <select id="<?php $this->EchoIdent('len'); ?>" name="<?php $this->EchoIdent('len'); ?>"><?php
                             $curr = $this->GetPasswordLen();
                             foreach(array_merge(array(0), range(4, 16)) as $value){
                                 $sel = ($value == $curr) ? ' selected="selected"' : '';
@@ -916,14 +1170,14 @@ class WpPasswordPolicyManager
                     </td>
                 </tr>
                 <tr valign="top">
-                    <th><label for="<?php $this->EchoIdent('msp'); ?>"><?php _e('Password History Policy', 'wp-password-policy-manager'); ?></label></th>
+                    <th><label for="<?php $this->EchoIdent('msp'); ?>"><?php _e('Password History Policy','wp-password-policy-manager'); ?></label></th>
                     <td>
                         <fieldset>
-                            <?php _e('Remember'); ?>
-                            <select type="text" id="<?php $this->EchoIdent('msp'); ?>" name="<?php $this->EchoIdent('msp'); ?>"><?php
-                                $curr = $this->GetMaxSamePass();
+                            <?php _e('Remember','wp-password-policy-manager'); ?>
+                            <select id="<?php $this->EchoIdent('msp'); ?>" name="<?php $this->EchoIdent('msp'); ?>"><?php
+                                $crt = $this->GetMaxSamePass();
                                 foreach(array_merge(array(0), range(2, 10)) as $value){
-                                    $sel = ($value == $curr) ? ' selected="selected"' : '';
+                                    $sel = ($value == $crt) ? ' selected="selected"' : '';
                                     ?><option value="<?php echo $value; ?>"<?php echo $sel; ?>>
                                     <?php echo ($value == 0 ? '' : $value); ?>
                                     </option><?php
@@ -933,6 +1187,29 @@ class WpPasswordPolicyManager
                         </fieldset>
                     </td>
                 </tr>
+
+
+<?php if($this->IsMultisite() && is_super_admin()) :?>
+                <tr valign="top">
+                    <th><label for="<?php $this->EchoIdent('daa'); ?>"><?php _e('Disable Admins Access','wp-password-policy-manager'); ?></label></th>
+                    <td>
+                        <fieldset>
+                            <legend class="screen-reader-text"><span><?php _e('Disable Admins Access', 'wp-password-policy-manager'); ?></span></legend>
+                            <label for="<?php $this->EchoIdent('daa'); ?>">
+                                <input type="checkbox"
+                                        value="1"
+                                        id="<?php $this->EchoIdent('daa');?>"
+                                        name="<?php $this->EchoIdent('daa');?>"
+                                        <?php echo (((bool)$this->GetGlobalOption(self::OPT_DISABLE_ADMINS)) ? 'checked="checked"' : '');?>
+                                    />
+                                <?php _e("Disallow site administrators from modifying the plugin's settings.",'wp-password-policy-manager'); ?>
+                            </label>
+                        </fieldset>
+                    </td>
+                </tr>
+<?php endif; /* End if is multisite */?>
+
+
                 <tr>
                     <th><label for="ExemptTokenQueryBox"><?php _e('Users and Roles Exempt From Policies', 'wp-password-policy-manager'); ?></label></th>
                     <td>
@@ -940,15 +1217,17 @@ class WpPasswordPolicyManager
                             <input type="text" id="ExemptTokenQueryBox" style="float: left; display: block; width: 250px;">
                             <input type="button" id="ExemptTokenQueryAdd" style="float: left; display: block;" class="button-primary" value="Add">
                             <br style="clear: both;"/>
-                            <p class="description"><?php
-                                _e('Users and Roles in this list are free of all Password Policies.', 'wp-password-policy-manager');
-                                ?></p>
+                            <p class="description">
+                                <?php
+                                    _e('Users and Roles in this list are free of all Password Policies.', 'wp-password-policy-manager');
+                                ?>
+                            </p>
                             <div id="ExemptTokenList"><?php
                                 foreach($this->GetExemptTokens() as $item){
                                     ?><span class="sectoken-<?php echo $this->GetTokenType($item); ?>">
                                     <input type="hidden" name="ExemptTokens[]" value="<?php echo esc_attr($item); ?>"/>
                                     <?php echo esc_html($item); ?>
-                                    <a href="javascript:;" title="Remove">&times;</a>
+                                    <a href="javascript:return false;" title="Remove">&times;</a>
                                     </span><?php
                                 }
                                 ?></div>
@@ -957,20 +1236,140 @@ class WpPasswordPolicyManager
                 </tr>
                 <tr valign="top">
                     <th scope="row"><label for="rst-submit-button"><?php _e("Reset All Users' Passwords", 'wp-password-policy-manager');?></label></th>
-                    <td><input id="rst-submit-button" type="submit" name="<?php $this->EchoIdent('rst'); ?>" class="button-secondary" value="<?php esc_attr_e(__('Reset All Passwords', 'wp-password-policy-manager')); ?>"
-                               onclick="return confirm(<?php esc_attr_e(json_encode(__('Are you sure you want to reset all passwords?', 'wp-password-policy-manager'))); ?>);"/></td>
-                </tr>
+                    <td>
+<?php if($this->IsMultisite() && is_super_admin()){ ?>
+<div id="sa_options_container" style="margin: 10px 0 10px 0;">
+    <div>
+        <label for="wppm-all-sites">
+            <?php _e('All sites on network:', 'wp-password-policy-manager');?>
+            <input id="wppm-all-sites" name="wppm-reset-sites" type="radio" value="-1" style="margin-left: 10px;"/>
+        </label>
+        <br/>
+        <label for="wppm-specific-site">
+            <?php _e('Specific site on Network:', 'wp-password-policy-manager');?>
+            <input id="wppm-specific-site" name="wppm-reset-sites" type="radio" style="margin-left: 10px;"
+                   placeholder="<?php _e('Search for a site', 'wp-password-policy-manager');?>"/>
+        </label>
+    </div>
+</div>
+<script type="text/javascript">
+    jQuery(function($)
+    {
+        var inputSelect = $("#wppm-specific-site");
+        inputSelect.select2({
+            minimumInputLength: 2,
+            ajax: { // Select2's convenient helper
+                url: ajaxurl,
+                type: "POST",
+                dataType: 'json',
+                quietMillis: 250,
+                data: function (term, page) {
+                    return {
+                        q: term // search term
+                        ,action: 'get_blogs_ajax'
+                        ,nonce: $('#_wpnonce').val()
+                    };
+                },
+                results: function (data, page) { // parse the results into the format expected by Select2.
+                    // since we are using custom formatting functions we do not need to alter the remote JSON data
+                    return { results: data.data };
+                },
+                cache: false
+            },
+            initSelection: function(element, callback) {
+                var id = $(element).val();
+                if (id !== "") {
+                    $.post(ajaxurl, {
+                        q: <?php echo get_current_blog_id();?>
+                        ,action: 'get_blogs_ajax'
+                        ,nonce: $('#_wpnonce').val()
+                    }).done(function(data) { callback(data); });
+                }
+            },
+            formatResult: function(entry){
+                return entry.name
+            },
+            formatSelection: function(entry){
+                return entry.name
+            },
+            dropdownAutoWidth : true,
+            escapeMarkup: function (m) { return m; } // no escaping needed
+        })
+            .on("select2-close", function() {
+                // check value
+                var v = parseInt(inputSelect.select2("val"), 10);
+                if(isNaN(v) || v < 1){
+                    setTimeout(function(){
+                        $('#wppm-all-sites').prop('checked', true);
+                    }, 250);
+                }
+            })
+            .on("select2-focus", function(e) {
+                $('#wppm-all-sites').removeAttr('checked');
+            })
+            .on("select2-open", function() {
+                $('#wppm-all-sites').removeAttr('checked');
+            });
 
+        // Set the default value
+        inputSelect.select2("val", 0);
+
+        // Check the first option
+        $('#wppm-all-sites').prop('checked', true);
+    });
+</script>
+<?php };  /* End if is multisite && SA */?>
+<script type="text/javascript">
+    jQuery(function($){
+        $('#rst-submit-button').on('click', function()
+        {
+            if(confirm("<?php esc_attr_e(__('Are you sure you want to reset all passwords?', 'wp-password-policy-manager'));?>")){
+                if($('#wppm-all-sites').prop('checked') == true) {
+                    return true;
+                }
+                else {
+                    var input = $('#wppm-specific-site'),
+                        value = input.select2("val");
+                    if(input && !isNaN(value) && value >= 1){
+                        input.prop('checked','checked').val(value);
+                        return true;
+                    }
+                }
+            }
+            return false;
+        });
+    });
+</script>
+                        <input id="rst-submit-button" type="submit"
+                               name="<?php $this->EchoIdent('rst'); ?>"
+                               class="button-secondary"
+                               value="<?php esc_attr_e(__('Reset All Passwords', 'wp-password-policy-manager')); ?>"/>
+                        </td>
+                    </tr>
+                <?php if(!defined('DISABLE_WP_CRON') || !DISABLE_WP_CRON) { ?>
+                <tr valign="top">
+                    <th scope="row"><label for="<?php $this->EchoIdent('wpcron');?>"><?php _e("Use WP Cron",'wp-password-policy-manager');?></label></th>
+                    <td>
+                        <?php
+                            $wpUseCron = $this->GetGlobalOption(self::CRON_RESET_PWD_OPT_NAME);
+                        ?>
+                        <input type="checkbox" name="<?php $this->EchoIdent('wpcron');?>"
+                               id="<?php $this->EchoIdent('wpcron');?>" <?php checked($wpUseCron);?> />
+                        <p class="description"><?php _e('Only check this option if your site has many users.','wp-password-policy-manager'); ?></p>
+                    </td>
+                </tr>
+                <?php } ?>
                 </tbody>
             </table>
-            <?php wp_nonce_field( 'nonce_form' ); ?>
             <!-- Policy Flags: <?php echo $this->_policy_flag_cache; ?> -->
             <p class="submit">
-                <input type="submit" name="<?php $this->EchoIdent('snt'); ?>" class="button-primary" value="<?php esc_attr_e(__('Save Changes', 'wp-password-policy-manager')); ?>" />
+                <input type="submit" name="<?php $this->EchoIdent('snt'); ?>" class="button-primary"
+                       value="<?php esc_attr_e(__('Save Changes', 'wp-password-policy-manager')); ?>" />
             </p>
         </form>
         </div><?php
     }
+
     /**
      * Returns whether policies for specified user are applicable or not.
      * @param WP_User|integer $userOrUid Either user instance or user id.
@@ -1071,10 +1470,9 @@ class WpPasswordPolicyManager
     public static function ClearUserPrevPwds($uid){
         return self::_DeleteGlobalOption(self::_getPwdListOptName($uid));
     }
-    // </editor-fold>
+// </editor-fold desc="Misc Functionality">
 
-    // <editor-fold desc="WordPress Hooks and Filters">
-
+// <editor-fold desc="WordPress Hooks and Filters">
     public function profile_update($user_id){
         $this->_addPwdToList($user_id, get_userdata($user_id)->user_pass);
     }
@@ -1105,7 +1503,16 @@ class WpPasswordPolicyManager
         add_submenu_page('settings.php', __('Password Policies', 'wp-password-policy-manager'), __('Password Policies', 'wp-password-policy-manager'), 'manage_network_options', self::PLG_CONFIG_MENU_NAME, array($this, 'ManageWpOptions'));
     }
     public function admin_enqueue_scripts(){
-        wp_enqueue_style('wppm', $this->GetBaseUrl() . 'css/wppm.css', array(), filemtime($this->GetBaseDir() . 'css/wppm.css'));
+        $baseUrl = trailingslashit($this->GetBaseUrl());
+        $baseDir = trailingslashit($this->GetBaseDir());
+        wp_enqueue_style('wppm', $baseUrl.'css/wppm.css', array(), filemtime($baseDir.'css/wppm.css'));
+
+        //since 0.8
+        if($this->IsMultisite() && is_super_admin()){
+            wp_enqueue_style('wppm-select2-css', $baseUrl.'js/select2/select2.css', array(), filemtime($baseDir.'js/select2/select2.css'));
+            wp_enqueue_style('wppm-select2-bs-css', $baseUrl.'js/select2/select2-bootstrap.css', array(), filemtime($baseDir.'js/select2/select2-bootstrap.css'));
+            wp_enqueue_script('wppm-select2-min-js', $baseUrl.'js/select2/select2.min.js', array('jquery'), filemtime($baseDir.'js/select2/select2.min.js'));
+        }
     }
     public function admin_footer(){
         if($this->IsJustInstalled()){
@@ -1147,8 +1554,75 @@ class WpPasswordPolicyManager
         foreach ($users as $user)
             self::ClearUserPrevPwds($user->ID);
     }
-    // </editor-fold>
+
+    /**
+     * Register the ajax request
+     * @since 0.8
+     */
+    public function admin_init() {
+        add_action('wp_ajax_get_blogs_ajax', array($this,'get_blogs_ajax'));
+    }
+// </editor-fold desc="WordPress Hooks and Filters">
+
+
+//<editor-fold desc="::: WP Cron">
+    const WP_CRON_ACTION = 'wppm_cron_task';
+    const CRON_RESET_PWD_BID_OPT_NAME = 'wppm_cron_reset_pwd_bid';
+    const CRON_RESET_PWD_OPT_NAME = 'wppm_cron_reset_pwds';
+
+
+    public function _cronSchedule(){
+        if( !wp_next_scheduled( self::WP_CRON_ACTION ) ) {
+            wp_schedule_event( time(), 'ten_minutes', self::WP_CRON_ACTION );
+//            error_log('CRON TASK SCHEDULED');
+        }
+    }
+    public function _cronUnschedule(){
+        // find out when the last event was scheduled
+        $timestamp = wp_next_scheduled (self::WP_CRON_ACTION);
+        // unschedule previous event if any
+        wp_unschedule_event($timestamp, self::WP_CRON_ACTION);
+    }
+    public function _cronDoAction(){
+        $blogId = $this->GetGlobalOption(self::CRON_RESET_PWD_BID_OPT_NAME);
+        if(false !== $blogId){
+            global $wpdb;
+            $query = "SELECT DISTINCT(blog_id) FROM ".$wpdb->blogs.' WHERE spam = 0 AND deleted = 0';
+            $blogs = $wpdb->get_results($query, ARRAY_A);
+            if(empty($blogs)){
+//                error_log(__FUNCTION__.'() Error: no blogs found.');
+                return false;
+            }
+            foreach($blogs as $blog){
+                $this->_resetPasswordsHelper($blog['blog_id'], false, true);
+            }
+        }
+    }
+    public function _cronAddCustomInterval($schedules){
+        if(! is_array($schedules)){
+            $schedules = array();
+        }
+        $schedules['ten_minutes'] = array(
+            'interval'	=> 600,	// Number of seconds, 600 in 10 minutes
+            'display'	=> __('Once Every 10 Minutes','wp-password-policy-manager')
+        );
+        return $schedules;
+    }
+//</editor-fold desc="::: WP Cron">
 }
+
+$wppm = WpPasswordPolicyManager::GetInstance();
+$action = $wppm::WP_CRON_ACTION;
+/*
+ * WP Cron
+ */
+add_filter( 'cron_schedules', array($wppm, '_cronAddCustomInterval'), 98, 1 );
+add_action( 'wp', array($wppm, '_cronSchedule') ); // frontend
+add_action( 'plugins_loaded', array($wppm, '_cronSchedule') ); // backend
+add_action( "{$action}", array($wppm, '_cronDoAction') );
+register_deactivation_hook( __FILE__, array($wppm, '_cronUnschedule') );
+
 register_uninstall_hook(__FILE__, array('WpPasswordPolicyManager', 'on_uninstall'));
-// Create & Run the plugin
-return WpPasswordPolicyManager::GetInstance();
+
+// Instantiate & Run the plugin
+return $wppm;
